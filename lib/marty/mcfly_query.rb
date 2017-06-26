@@ -106,6 +106,37 @@ module Mcfly
         end
       end
 
+      def g_mcfly_lookup(name, attrs, options={})
+        cache = options[:cache]
+        mode = options.fetch(:mode, :first)
+        # mode = :to_a if mode == :all
+
+        raise "bad options #{options.keys}" unless
+          (options.keys - [:mode, :cache]).empty?
+
+        raise "oops caching w/ mode=nil" if cache && !mode
+
+        # FIXME: any code using mode=:all is likely bogus and should
+        # be changed.
+
+        raise "bad mode #{mode}" unless [nil, :first].member?(mode)
+        raise "bad attrs" unless Array === attrs
+
+        send(cache ? :cached_mcfly_lookup : :mcfly_lookup,
+             name, sig: attrs.length+1) do
+          |t, *attr_list|
+
+          q = where('')
+
+          attr_list = attr_list.each_with_index.map {
+            |x, i|
+            q = q.where(attrs[i] => attr_list[i])
+          }
+
+          mode ? q.send(mode) : q
+        end
+      end
+
       ######################################################################
 
       # Generates categorization lookups.  For instance,
