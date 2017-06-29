@@ -12,13 +12,16 @@ module Mcfly
         @LOOKUP_CACHE.clear if @LOOKUP_CACHE
       end
 
-      # Implements a VERY HACKY class-based caching mechanism for
-      # database lookup results.  Issues include: cached values are
-      # ActiveRecord objects.  Not sure if these should be shared
-      # across connections.  Query results can potentially be very
-      # large lists which we simply count as one item in the cache.
-      # Caching mechanism will result in large processes.  Caches are
-      # not sharable across different Ruby processes.
+      # FIXME IDEA: we just make :cache an argument to delorean_fn.
+      # That way, we don't need the cached_ flavors.  It'll make all
+      # this code a lot simpler.  We should also just add the :private
+      # mechanism here.
+
+      # Implements a VERY HACKY class-based (per process) caching
+      # mechanism for database lookup results.  Issues include: cached
+      # values are ActiveRecord objects.  Query results can be very
+      # large lists which we count as one item in the cache.  Caching
+      # mechanism will result in large processes.
       def cached_delorean_fn(name, options = {}, &block)
         @LOOKUP_CACHE ||= {}
 
@@ -55,7 +58,7 @@ module Mcfly
       # FIXME: duplicate code from Mcfly's mcfly_lookup.
       def cached_mcfly_lookup(name, options = {}, &block)
         cached_delorean_fn(name, options) do |ts, *args|
-          raise "time cannot be nil" if ts.nil?
+          raise "nil timestamp" if ts.nil?
 
           ts = Mcfly.normalize_infinity(ts)
 
@@ -65,74 +68,54 @@ module Mcfly
         end
       end
 
-      # FIXME: for validation purposes, this mechanism should make
-      # sure that the allable attrs are not required.
+      # FIXME: add private mode.  This should make the function
+      # unavailable to delorean.
       def gen_mcfly_lookup(name, attrs, options={})
-        raise "bad options" unless options.is_a?(Hash)
-
-        # FIXME: mode should be sent later, not as a part of
-        # gen_mcfly_lookup.  i.e. we just generate the search and the
-        # mode is applied at runtime by delorean code.  That would
-        # allow lookups to be used in either mode dynamically.
         mode = options.fetch(:mode, :first)
 
+        # if mode is nil, don't cache -- i.e. don't cache AR queries
+        cache = mode && options[:cache]
+
+        raise "bad options #{options.keys}" unless
+          (options.keys - [:mode, :cache, :private]).empty?
+
+        # the older mode=:all is not supported (it's bogus)
+        raise "bad mode #{mode}" unless [nil, :first].member?(mode)
+
         assoc = Set.new(self.reflect_on_all_associations.map(&:name))
-        attr_names = attrs.keys
-
-        allables = attrs.select {|k, v| v}
-
-        order = allables.keys.reverse.map { |k|
-          k = "#{k}_id" if assoc.member?(k)
-          "#{k} NULLS LAST"
-        }.join(", ")
 
         qstr = attrs.map {|k, v|
           k = "#{k}_id" if assoc.member?(k)
           v ? "(#{k} = ? OR #{k} IS NULL)" : "(#{k} = ?)"
         }.join(" AND ")
 
-        cached_mcfly_lookup(name, sig: attrs.length+1) do
+        if Hash === attrs
+          order = attrs.select {|k, v| v}.keys.reverse.map { |k|
+            k = "#{k}_id" if assoc.member?(k)
+            "#{k} NULLS LAST"
+          }.join(", ")
+          attrs = attrs.keys
+        else
+          raise "bad attrs" unless Array === attrs
+        end
+
+        fn = cache ? :cached_mcfly_lookup : :mcfly_lookup
+
+        # hacky: if private, set sig to bad value -- i.e. can't be
+        # called from delorean.  Ideally, we should have a 'private'
+        # option for delorean_fn.
+        sig = options[:private] ? -1 : attrs.length+1
+
+        send(fn, name, sig: sig) do
           |t, *attr_list|
 
           attr_list_ids = attr_list.each_with_index.map {|x, i|
-            assoc.member?(attr_names[i]) ?
+            assoc.member?(attrs[i]) ?
             (attr_list[i] && attr_list[i].id) : attr_list[i]
           }
 
           q = self.where(qstr, *attr_list_ids)
-          q = q.order(order) unless order.empty?
-          mode = :to_a if mode == :all
-          mode ? q.send(mode) : q
-        end
-      end
-
-      def g_mcfly_lookup(name, attrs, options={})
-        cache = options[:cache]
-        mode = options.fetch(:mode, :first)
-        # mode = :to_a if mode == :all
-
-        raise "bad options #{options.keys}" unless
-          (options.keys - [:mode, :cache]).empty?
-
-        raise "oops caching w/ mode=nil" if cache && !mode
-
-        # FIXME: any code using mode=:all is likely bogus and should
-        # be changed.
-
-        raise "bad mode #{mode}" unless [nil, :first].member?(mode)
-        raise "bad attrs" unless Array === attrs
-
-        send(cache ? :cached_mcfly_lookup : :mcfly_lookup,
-             name, sig: attrs.length+1) do
-          |t, *attr_list|
-
-          q = where('')
-
-          attr_list = attr_list.each_with_index.map {
-            |x, i|
-            q = q.where(attrs[i] => attr_list[i])
-          }
-
+          q = q.order(order) if order
           mode ? q.send(mode) : q
         end
       end
@@ -179,16 +162,20 @@ module Mcfly
         }
 
         pc_name = "pc_#{name}".to_sym
-        gen_mcfly_lookup(pc_name, pc_attrs, options)
+
+        gen_mcfly_lookup(pc_name, pc_attrs, options + {private: true})
 
         lpi = attrs.keys.index rel_attr
 
-        raise "should not include #{cat_attr}" if
-          attrs.member?(cat_attr)
-
+        raise "should not include #{cat_attr}" if attrs.member?(cat_attr)
         raise "need #{rel_attr} argument" unless lpi
 
-        delorean_fn(name, sig: attrs.length+1) do |ts, *args|
+        # cache if mode is not nil
+        fn = options.fetch(:mode, :first) ? :cached_delorean_fn : :delorean_fn
+
+        send(fn, name, sig: attrs.length+1) do
+          |ts, *args|
+
           # Example: rel is a Gemini::SecurityInstrument instance.
           rel = args[lpi]
           raise "#{rel_attr} can't be nil" unless rel
@@ -200,8 +187,8 @@ module Mcfly
             categorizing_obj
 
           pc = categorizing_obj.send(cat_attr)
-          raise ("#{categorizing_obj} must have assoc." +
-                 " #{cat_attr}/#{rel.inspect}") unless pc
+          raise "#{categorizing_obj} must have assoc.
+                 #{cat_attr}/#{rel.inspect}" unless pc
 
           args[lpi] = pc
           self.send(pc_name, ts, *args)
