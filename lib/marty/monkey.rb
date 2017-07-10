@@ -252,3 +252,38 @@ module ActiveRecord
     end
   end
 end
+
+######################################################################
+
+class ActiveRecord::Base
+  class << self
+    alias_method :old_joins, :joins
+
+    def joins(*args)
+      # when joins args are strings, checks to see if they're
+      # associations attrs.  If so, convert them to symbols for joins
+      # to work properly.
+      new_args = args.map {|a|
+        self.reflections.has_key?(a) ? a.to_sym : a
+      }
+      old_joins(*new_args)
+    end
+  end
+end
+
+args_hack = [[ActiveRecord::Relation, ActiveRecord::QueryMethods::WhereChain]] +
+            [[Object, nil]]*10
+
+Delorean::RUBY_WHITELIST.
+  merge!({
+           count:    [ActiveRecord::Relation],
+           distinct: args_hack,
+           group:    args_hack,
+           joins:    args_hack,
+           limit:    [ActiveRecord::Relation, Integer],
+           not:      args_hack,
+           order:    args_hack,
+           pluck:    args_hack,
+           select:   args_hack,
+           where:    args_hack,
+         })
