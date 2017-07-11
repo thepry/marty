@@ -45,6 +45,17 @@ A:
     gg = [r.attributes for r in g]
 
     n = Gemini::FannieBup.where.not("settlement_mm < 12").count
+
+    q = Gemini::FannieBup.where("settlement_mm = 12")
+    q1 = q.order("note_rate ASC").pluck("note_rate")
+    q2 = q.order("note_rate DESC").pluck("note_rate")
+
+    settlement_mm =?
+    note_rate     =?
+    pq = Gemini::FannieBup.
+       where({"settlement_mm": settlement_mm}).
+       where("note_rate > ?", note_rate).
+       pluck("note_rate")
 EOF
 
   describe 'DeloreanQuery' do
@@ -105,6 +116,21 @@ EOF
       res = @engine.evaluate("A", "n", {})
 
       expect(res).to eq Gemini::FannieBup.where.not("settlement_mm < 12").count
+    end
+
+    it "perfroms query+query" do
+      res = @engine.evaluate_attrs("A", ["q1", "q2"], {})
+
+      expect(res).to eq [
+                       [2.25, 2.375, 2.5, 2.625, 2.75, 2.875],
+                       [2.875, 2.75, 2.625, 2.5, 2.375, 2.25],
+                     ]
+    end
+
+    it "handle query params" do
+      res = @engine.evaluate("A", "pq",
+                             {"settlement_mm" => 12, "note_rate" => 2.5})
+      expect(res).to eq [2.625, 2.75, 2.875]
     end
   end
 end
