@@ -255,6 +255,16 @@ end
 
 ######################################################################
 
+class ActiveRecord::Relation
+  def mcfly_pt(pt, cls=nil)
+    cls ||= self.klass
+    tb = cls.table_name
+    self.where("#{tb}.obsoleted_dt >= ? AND #{tb}.created_dt < ?", pt, pt)
+  end
+end
+
+######################################################################
+
 class ActiveRecord::Base
   class << self
     alias_method :old_joins, :joins
@@ -274,16 +284,18 @@ end
 args_hack = [[ActiveRecord::Relation, ActiveRecord::QueryMethods::WhereChain]] +
             [[Object, nil]]*10
 
-Delorean::RUBY_WHITELIST.
-  merge!({
-           count:    [ActiveRecord::Relation],
-           distinct: args_hack,
-           group:    args_hack,
-           joins:    args_hack,
-           limit:    [ActiveRecord::Relation, Integer],
-           not:      args_hack,
-           order:    args_hack,
-           pluck:    args_hack,
-           select:   args_hack,
-           where:    args_hack,
-         })
+Delorean::RUBY_WHITELIST.merge!(
+  count:    [ActiveRecord::Relation],
+  distinct: args_hack,
+  group:    args_hack,
+  joins:    args_hack,
+  limit:    [ActiveRecord::Relation, Integer],
+  not:      args_hack,
+  order:    args_hack,
+  pluck:    args_hack,
+  select:   args_hack,
+  where:    args_hack,
+  mcfly_pt: [ActiveRecord::Relation,
+             [Date, Time, ActiveSupport::TimeWithZone, String],
+             [nil, Class]],
+)

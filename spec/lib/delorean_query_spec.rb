@@ -56,6 +56,15 @@ A:
        where({"settlement_mm": settlement_mm}).
        where("note_rate > ?", note_rate).
        pluck("note_rate")
+
+    m = Gemini::FannieBup.
+      joins("bud_category").
+      mcfly_pt('infinity').
+      select("name").
+      pluck("name")
+
+    mm = Gemini::FannieBup.
+      mcfly_pt('01-01-2003').count
 EOF
 
   describe 'DeloreanQuery' do
@@ -90,6 +99,20 @@ EOF
                           select("name").
                           distinct("name").
                           pluck("name")
+    end
+
+    it "perfroms mcfly_pt" do
+      res = @engine.evaluate_attrs("A", ["m", "mm"], {})
+
+      expect(res).to eq [
+                       Gemini::FannieBup.
+                         joins("bud_category").
+                         mcfly_pt('infinity').
+                         select("name").
+                         pluck("name"),
+                       Gemini::FannieBup.
+                         mcfly_pt('01-01-2003').count,
+                     ]
     end
 
     it "perfroms order+first" do

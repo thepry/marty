@@ -62,7 +62,7 @@ module Mcfly
 
           ts = Mcfly.normalize_infinity(ts)
 
-          where("obsoleted_dt >= ? AND created_dt < ?", ts, ts).scoping do
+          self.mcfly_pt(ts).scoping do
             block.call(ts, *args)
           end
         end
@@ -86,12 +86,14 @@ module Mcfly
 
         qstr = attrs.map {|k, v|
           k = "#{k}_id" if assoc.member?(k)
+
           v ? "(#{k} = ? OR #{k} IS NULL)" : "(#{k} = ?)"
         }.join(" AND ")
 
         if Hash === attrs
           order = attrs.select {|k, v| v}.keys.reverse.map { |k|
             k = "#{k}_id" if assoc.member?(k)
+
             "#{k} NULLS LAST"
           }.join(", ")
           attrs = attrs.keys
