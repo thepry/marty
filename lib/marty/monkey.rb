@@ -299,3 +299,12 @@ Delorean::RUBY_WHITELIST.merge!(
              [Date, Time, ActiveSupport::TimeWithZone, String],
              [nil, Class]],
 )
+
+######################################################################
+
+module Mcfly::Controller
+  # define mcfly user to be Flowscape's current_user.
+  def user_for_mcfly
+    find_current_user rescue nil
+  end
+end

@@ -1,7 +1,6 @@
 require 'mcfly'
 
 module Mcfly::Model
-
   def self.included(base)
     base.send :extend, ClassMethods
   end
@@ -184,12 +183,5 @@ module Mcfly::Model
         self.send(pc_name, ts, *args)
       end
     end
-  end
-end
-
-module Mcfly::Controller
-  # define mcfly user to be Flowscape's current_user.
-  def user_for_mcfly
-    find_current_user rescue nil
   end
 end
