@@ -40,9 +40,12 @@ class Marty::Posting < Marty::Base
     o
   end
 
-  # FIXME: caching will have problems if we allow deletion of
-  # postings.
-  cached_delorean_fn :lookup, sig: 1 do
+  # Not using mcfly_lookup since we don't want these time-warp markers
+  # time-warped. FIXME: perhaps this should use mcfly_lookup since we
+  # may allow deletion of postings.  i.e. a new one with same name
+  # might be created.  Or, use regular validates_uniqueness_of instead
+  # of mcfly_validates_uniqueness_of.
+  delorean_fn :lookup, sig: 1 do
     |name|
     self.find_by_name(name)
   end
