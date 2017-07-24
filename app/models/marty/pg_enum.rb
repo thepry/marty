@@ -1,12 +1,15 @@
 module Marty::PgEnum
 
   def [](index)
-    index = index.to_s
+    # index = index.to_s
 
-    raise "no such #{self.name}: '#{index}'" unless
-      self::VALUES.include?(index)
+    # FIMXE: no longer checks to see if enum is member of VALUES.
+    # Some VALUES are now dynamically loaded.
 
-    StringEnum.new(index)
+    #raise "no such #{self.name}: '#{index}'" unless
+    #  self::VALUES.include?(index)
+
+    StringEnum.new(index.to_s)
   end
 
   def get_all

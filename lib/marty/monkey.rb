@@ -202,7 +202,7 @@ end
 class StringEnum < String
   include Delorean::Model
   def name
-    self
+    self.to_s
   end
   def id
     self
@@ -224,6 +224,7 @@ class StringEnum < String
     new(v)
   end
 end
+
 YAML::add_domain_type("pennymac.com,2017-06-02", "stringEnum") do
   |type, val|
   StringEnum.new(val)

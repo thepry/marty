@@ -175,8 +175,9 @@ module Mcfly::Model
 
         args[lpi] = cat_assoc_klass.
                       mcfly_pt(ts).
-                      joins(cat_attr).
-                      where(rel_attr => rel.id).
+                      # FIXME: XXXX why is this join needed???
+                      # joins(cat_attr).
+                      where(rel_attr => rel).
                       pluck("#{cat_attr}_id").
                       first
 
