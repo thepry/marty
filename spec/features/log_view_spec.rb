@@ -16,7 +16,7 @@ feature 'logger view', js: true, capybara: true do
   end
 
   before(:all) do
-    self.use_transactional_fixtures = false
+    self.use_transactional_tests = false
     @db =  SQLite3::Database.new(Marty::Log.logfile)
 
     info_s = { info: 'message' }
@@ -43,7 +43,7 @@ feature 'logger view', js: true, capybara: true do
     restore_clean_db(@clean_file)
     @db.execute "delete from log"
     @db.close
-    self.use_transactional_fixtures = true
+    self.use_transactional_tests = true
   end
 
   let(:logview) { netzke_find('log_view') }
