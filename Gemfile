@@ -31,3 +31,7 @@ group :development, :test do
   # gem 'marty_rspec', path: File.expand_path('../../marty_rspec', __FILE__)
   gem 'marty_rspec'
 end
+
+group :test do
+  gem 'sqlite3'
+end
