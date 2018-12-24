@@ -39,7 +39,7 @@ Gem::Specification.new do |s|
   # FIXME: for some reason 0.16.1 doesn't work at PennyMac -- investigate
   s.add_dependency 'net-ldap', '0.12.1'
   s.add_dependency 'rubyzip'
-  s.add_dependency 'sqlite3'
+  # s.add_dependency 'sqlite3'
   s.add_dependency 'json-schema'
 
   # used for signing aws ec2 requests
