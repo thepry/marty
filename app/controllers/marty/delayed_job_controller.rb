@@ -7,6 +7,7 @@ class Marty::DelayedJobController < ActionController::Base
   private
 
   def delayed_job
+    return unless params['id'].present?
     @delayed_job ||= ::Delayed::Job.find_by(id: params['id'])
   end
 
@@ -14,7 +15,7 @@ class Marty::DelayedJobController < ActionController::Base
     return if delayed_job.locked_at.present?
 
     ::Delayed::Job.where(id: delayed_job.id).
-      update_all(locked_at: ::Delayed::Job.db_time_now, locked_by: "Lambda")
+      update_all(locked_at: ::Delayed::Job.db_time_now, locked_by: 'Lambda')
 
     w = ::Delayed::Worker.new
     w.run(delayed_job)
